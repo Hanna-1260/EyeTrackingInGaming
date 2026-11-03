@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eye Tracking</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  video, canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+  video { object-fit: contain; opacity: 0.8; }
+  video.playing { opacity: 1; }
+  button { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; font-size: 20px; padding: 10px 24px; }
+</style>
+</head>
+<body>
+<video id="video" src="video.mov" playsinline preload="auto"></video>
+<canvas id="canvas"></canvas>
+<button id="play">Play</button>
+<button id="copy" hidden>Copy</button>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const playBtn = document.getElementById('play');
+const copyBtn = document.getElementById('copy');
+const points = [];
+let tracking = false;
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  draw(ctx);
+}
+addEventListener('resize', resize);
+resize();
+
+function draw(c) {
+  const color = i => `hsl(${i * 18}, 90%, 50%)`;
+  c.lineWidth = 2;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const g = c.createLinearGradient(a.x, a.y, b.x, b.y);
+    g.addColorStop(0, color(i - 1));
+    g.addColorStop(1, color(i));
+    c.strokeStyle = g;
+    c.beginPath();
+    c.moveTo(a.x, a.y);
+    c.lineTo(b.x, b.y);
+    c.stroke();
+  }
+  points.forEach((p, i) => {
+    c.beginPath();
+    c.arc(p.x, p.y, 14, 0, Math.PI * 2);
+    c.fillStyle = color(i);
+    c.fill();
+    c.fillStyle = 'white';
+    c.font = 'bold 14px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(i + 1, p.x, p.y);
+  });
+}
+
+playBtn.addEventListener('click', () => {
+  playBtn.hidden = true;
+  tracking = true;
+  video.classList.add('playing');
+  video.play();
+});
+
+canvas.addEventListener('click', e => {
+  if (!tracking) return;
+  points.push({ x: e.clientX, y: e.clientY });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  draw(ctx);
+});
+
+video.addEventListener('ended', () => {
+  tracking = false;
+  video.classList.remove('playing');
+  copyBtn.hidden = false;
+});
+
+copyBtn.addEventListener('click', () => {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const o = out.getContext('2d');
+  o.fillStyle = 'white';
+  o.fillRect(0, 0, out.width, out.height);
+  draw(o);
+  out.toBlob(blob => {
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      .then(() => copyBtn.textContent = 'Copied');
+  }, 'image/png');
+});
+</script>
+</body>
+</html>
